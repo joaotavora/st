@@ -6,7 +6,7 @@
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
 static char *font = "FiraCode:pixelsize=20"; // "TamzenForPowerline" also good
-static int borderpx = 2;
+static int borderpx = 30;
 
 /*
  * What program is execed by st depends of these precedence rules:
