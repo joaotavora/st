@@ -5,7 +5,7 @@
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
-static char *font = "FiraCode:pixelsize=20"; // "TamzenForPowerline" also good
+static char *font = "VictorMonoNerdFont:pixelsize=16"; // "TamzenForPowerline" also good
 static int borderpx = 30;
 
 /*
