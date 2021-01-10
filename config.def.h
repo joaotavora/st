@@ -5,7 +5,7 @@
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
-static char *font = "TamzenForPowerline:style=Regular:slant=0:weight=80:width=100:pixelsize=20:spacing=110:foundry=Misc:antialias=False:index=0:outline=False";
+static char *font = "TamzenForPowerline:pixelsize=20";
 static int borderpx = 25;
 
 /*
