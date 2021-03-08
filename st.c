@@ -1421,6 +1421,8 @@ tsetattr(int *attr, int l)
 {
 	int i;
 	int32_t idx;
+	static char x_rgbstr[7+1];
+
 
 	for (i = 0; i < l; i++) {
 		switch (attr[i]) {
@@ -1492,8 +1494,14 @@ tsetattr(int *attr, int l)
 			term.c.attr.fg = defaultfg;
 			break;
 		case 48:
-			if ((idx = tdefcolor(attr, &i, l)) >= 0)
+			if ((idx = tdefcolor(attr, &i, l)) >= 0){
 				term.c.attr.bg = idx;
+				if (attr[1] == 2){
+					sprintf(x_rgbstr, "#%02x%02x%02x", 
+						attr[2], attr[3], attr[4]);
+					xsetcolorname(256, x_rgbstr);
+				}
+			}
 			break;
 		case 49:
 			term.c.attr.bg = defaultbg;
