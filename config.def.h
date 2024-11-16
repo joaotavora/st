@@ -104,6 +104,9 @@ typedef struct {
  * Terminal colors (16 first used in escape sequence,
  * 2 last for custom cursor color),
  * foreground, background, cursor, reverse cursor
+ *
+ * JT@2024-11-16: Changing background color from the outside will only
+ * work if background color index is 0!!!! (usually is)
  */
 static const ColorScheme schemes[] = {
 	// st (dark)
