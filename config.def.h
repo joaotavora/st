@@ -109,6 +109,12 @@ typedef struct {
  * work if background color index is 0!!!! (usually is)
  */
 static const ColorScheme schemes[] = {
+        // Aurant
+        {{"#000000", "#ffffff", "#c990fc", "#d6e9bb",
+          "#c8a0ef", "#c697f2","#2fb0d7", "#d39758",
+          "#c990fc", "#f7c4d7", "#fba5c8", "#e0931e",
+          "#383e30", "#565f4a", "#7b866a", "#a5b490",
+          [256] = "#add8e6", "#555555"}, 15, 0, 256, 257},
 	// st (dark)
 	{{"black", "red3", "green3", "yellow3",
 	  "blue2", "magenta3", "cyan3", "gray90",
