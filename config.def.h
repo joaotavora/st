@@ -93,6 +93,13 @@ char *termname = "st-256color";
  */
 unsigned int tabspaces = 8;
 
+/*
+ * drag and drop escape characters
+ *
+ * this will add a '\' before any characters specified in the string.
+ */
+char *xdndescchar = " !\"#$&'()*;<>?[\\]^`{|}~";
+
 typedef struct {
 	const char* const colors[258]; /* terminal colors */
 	unsigned int fg;               /* foreground */
