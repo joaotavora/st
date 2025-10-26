@@ -966,6 +966,12 @@ xsetcolorname(int x, const char *name)
 	XftColorFree(xw.dpy, xw.vis, xw.cmap, &dc.col[x]);
 	dc.col[x] = ncolor;
 
+	if (x == defaultbg) {
+		dc.col[defaultbg].color.alpha = (unsigned short)(0xffff * alpha);
+		dc.col[defaultbg].pixel &= 0x00FFFFFF;
+		dc.col[defaultbg].pixel |= (unsigned char)(0xff * alpha) << 24;
+	}
+  
 	return 0;
 }
 
@@ -1605,7 +1611,7 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 	}
 
 	if (IS_TRUECOL(base.bg)) {
-		colbg.alpha = 0xffff;
+		colbg.alpha = (unsigned short)(0xffff * alpha);
 		colbg.green = TRUEGREEN(base.bg);
 		colbg.red = TRUERED(base.bg);
 		colbg.blue = TRUEBLUE(base.bg);
@@ -1634,7 +1640,7 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 			colbg.red = ~bg->color.red;
 			colbg.green = ~bg->color.green;
 			colbg.blue = ~bg->color.blue;
-			colbg.alpha = bg->color.alpha;
+			colbg.alpha = (unsigned short)(0xffff * alpha);
 			XftColorAllocValue(xw.dpy, xw.vis, xw.cmap, &colbg,
 					&revbg);
 			bg = &revbg;
