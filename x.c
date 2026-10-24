@@ -497,6 +497,11 @@ bpress(XEvent *e)
 	if (1 <= btn && btn <= 11)
 		buttons |= 1 << (btn-1);
 
+	/* Ctrl+wheel zooms even when the application grabs the mouse */
+	if ((btn == Button4 || btn == Button5) &&
+	    (e->xbutton.state & ControlMask) && mouseaction(e, 0))
+		return;
+
 	if (IS_SET(MODE_MOUSE) && !(e->xbutton.state & forcemousemod)) {
 		mousereport(e);
 		return;
