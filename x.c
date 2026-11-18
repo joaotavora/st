@@ -154,7 +154,11 @@ typedef struct {
 static inline ushort sixd_to_16bit(int);
 static void xresetfontsettings(ushort mode, Font **font, int *frcflags);
 static int xmakeglyphfontspecs(XftGlyphFontSpec *, const Glyph *, int, int, int);
-static void xdrawglyphfontspecs(const XftGlyphFontSpec *, Glyph, int, int, int, int);
+/* What xdrawglyphfontspecs draws: the background, the glyphs, or both. */
+enum { DRAW_BG = 1 << 0, DRAW_FG = 1 << 1 };
+
+static void xdrawglyphfontspecs(const XftGlyphFontSpec *, Glyph, int, int, int, int, int, int);
+static void xdrawrun(Line, Glyph, int, int, int, int, int);
 static void xdrawglyph(Glyph, int, int);
 static void xclear(int, int, int, int);
 static int xgeommasktogravity(int);
@@ -1586,8 +1590,14 @@ xmakeglyphfontspecs(XftGlyphFontSpec *specs, const Glyph *glyphs, int len, int x
 	return numspecs;
 }
 
+/*
+ * Draw CHARLEN cells starting at X, Y with the attributes of BASE.  WHAT
+ * says whether to draw their background, their glyphs, or both.  Glyphs
+ * are clipped to CLIPCOLS cells, which may exceed CHARLEN to let a wide
+ * glyph overflow into the next cell.
+ */
 void
-xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, int y, int charlen)
+xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, int y, int charlen, int clipcols, int what)
 {
 	int winx = borderpx + x * win.cw, winy = borderpx + y * win.ch,
 	    width = charlen * win.cw;
@@ -1673,29 +1683,34 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 	if (base.mode & ATTR_INVISIBLE)
 		fg = bg;
 
-	/* Intelligent cleaning up of the borders. */
-	if (x == 0) {
-		xclear(0, (y == 0)? 0 : winy, borderpx,
-			winy + win.ch +
-			((winy + win.ch >= borderpx + win.th)? win.h : 0));
-	}
-	if (winx + width >= borderpx + win.tw) {
-		xclear(winx + width, (y == 0)? 0 : winy, win.w,
-			((winy + win.ch >= borderpx + win.th)? win.h : (winy + win.ch)));
-	}
-	if (y == 0)
-		xclear(winx, 0, winx + width, borderpx);
-	if (winy + win.ch >= borderpx + win.th)
-		xclear(winx, winy + win.ch, winx + width, win.h);
+	if (what & DRAW_BG) {
+		/* Intelligent cleaning up of the borders. */
+		if (x == 0) {
+			xclear(0, (y == 0)? 0 : winy, borderpx,
+				winy + win.ch +
+				((winy + win.ch >= borderpx + win.th)? win.h : 0));
+		}
+		if (winx + width >= borderpx + win.tw) {
+			xclear(winx + width, (y == 0)? 0 : winy, win.w,
+				((winy + win.ch >= borderpx + win.th)? win.h : (winy + win.ch)));
+		}
+		if (y == 0)
+			xclear(winx, 0, winx + width, borderpx);
+		if (winy + win.ch >= borderpx + win.th)
+			xclear(winx, winy + win.ch, winx + width, win.h);
 
-	/* Clean up the region we want to draw to. */
-	XftDrawRect(xw.draw, bg, winx, winy, width, win.ch);
+		/* Clean up the region we want to draw to. */
+		XftDrawRect(xw.draw, bg, winx, winy, width, win.ch);
+	}
+
+	if (!(what & DRAW_FG))
+		return;
 
 	/* Set the clip region because Xft is sometimes dirty. */
 	r.x = 0;
 	r.y = 0;
 	r.height = win.ch;
-	r.width = width;
+	r.width = clipcols * win.cw;
 	XftDrawSetClipRectangles(xw.draw, winx, winy, &r, 1);
 
 	/* Render the glyphs. */
@@ -1719,11 +1734,13 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 void
 xdrawglyph(Glyph g, int x, int y)
 {
-	int numspecs;
+	int numspecs, charlen;
 	XftGlyphFontSpec *specs = xw.specbuf;
 
 	numspecs = xmakeglyphfontspecs(specs, &g, 1, x, y);
-	xdrawglyphfontspecs(specs, g, numspecs, x, y, (g.mode & ATTR_WIDE) ? 2 : 1);
+	charlen = (g.mode & ATTR_WIDE) ? 2 : 1;
+	xdrawglyphfontspecs(specs, g, numspecs, x, y, charlen, charlen,
+	                    DRAW_BG | DRAW_FG);
 }
 
 void
@@ -1879,34 +1896,60 @@ xstartdraw(void)
 	return IS_SET(MODE_VISIBLE);
 }
 
+/*
+ * Draw the run of cells from X1 to X2 in LINE, at row Y, which all have
+ * BASE's attributes.  XEND is where the drawn part of LINE ends.  WHAT
+ * is the pass of xdrawline: DRAW_BG or DRAW_FG.
+ */
+void
+xdrawrun(Line line, Glyph base, int x1, int x2, int y, int xend, int what)
+{
+	int numspecs = 0, clipcols = x2 - x1;
+	XftGlyphFontSpec *specs = xw.specbuf;
+
+	if (what & DRAW_FG) {
+		/*
+		 * Let the run's glyphs overflow into the cell after it, like
+		 * a Nerd Font icon wider than its cell.  That cell's
+		 * background is already drawn, so the overflow stays.
+		 */
+		if (x2 < xend)
+			clipcols++;
+		numspecs = xmakeglyphfontspecs(specs, &line[x1], x2 - x1, x1, y);
+	}
+	xdrawglyphfontspecs(specs, base, numspecs, x1, y, x2 - x1, clipcols, what);
+}
+
 void
 xdrawline(Line line, int x1, int y1, int x2)
 {
-	int i, x, ox, numspecs;
+	int i, x, ox, what;
 	Glyph base, new;
-	XftGlyphFontSpec *specs = xw.specbuf;
 
-	i = ox = 0;
-	for (x = x1; x < x2; x++) {
-		new = line[x];
-		if (new.mode == ATTR_WDUMMY)
-			continue;
-		if (selected(x, y1))
-			new.mode ^= ATTR_REVERSE;
-		if ((i > 0) && ATTRCMP(base, new)) {
-			numspecs = xmakeglyphfontspecs(specs, &line[ox], x - ox, ox, y1);
-			xdrawglyphfontspecs(specs, base, numspecs, ox, y1, x - ox);
-			i = 0;
+	/*
+	 * Draw all backgrounds first, then all glyphs, so a glyph wider
+	 * than its cells isn't covered by the background of the next run.
+	 */
+	for (what = DRAW_BG; what <= DRAW_FG; what <<= 1) {
+		i = ox = 0;
+		for (x = x1; x < x2; x++) {
+			new = line[x];
+			if (new.mode == ATTR_WDUMMY)
+				continue;
+			if (selected(x, y1))
+				new.mode ^= ATTR_REVERSE;
+			if ((i > 0) && ATTRCMP(base, new)) {
+				xdrawrun(line, base, ox, x, y1, x2, what);
+				i = 0;
+			}
+			if (i == 0) {
+				ox = x;
+				base = new;
+			}
+			i++;
 		}
-		if (i == 0) {
-			ox = x;
-			base = new;
-		}
-		i++;
-	}
-	if (i > 0) {
-		numspecs = xmakeglyphfontspecs(specs, &line[ox], x2 - ox, ox, y1);
-		xdrawglyphfontspecs(specs, base, numspecs, ox, y1, x2 - ox);
+		if (i > 0)
+			xdrawrun(line, base, ox, x2, y1, x2, what);
 	}
 }
 
